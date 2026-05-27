@@ -80,41 +80,72 @@ Sum from 1 to 9 is 45
 
 * You can edit and run your own C programs.
 ![RV_CP2](/images/RV_CP2.png)
-# Step 3: Clone and Run VSDFPGA Labs
-## VSDFPGA Labs
-### Setup
-1. Clone the repository:
-   ```bash
-   cd ~
-   git clone https://github.com/vsdip/vsdfpga_labs
-   ```
+# Step 3: Clone and Run VSDFPGA Labs 
+- clone the FPGA labs repository inside the same Codespace:
+
+```bash
+git clone https://github.com/vsdip/vsdfpga_labs.git
+cd vsdfpga_labs
+```
 ![FP_CP](/images/FP_CP.png)
----
+- Follow the README instructions in vsdfpga_labs
+- Install the following tools before proceeding:
 
-## Building & Flashing
-1. Review the RISC-V logo code (do not modify):
-   ```bash
-   cd ~/vsdfpga_labs/basicRISCV/Firmware
-   nano riscv_logo.c  # Review and close (Ctrl+X)
-   make riscv_logo.bram.hex
-   ```
-You should see the below messages
-![Make RISC-V output](/images/FP_CP1.png)
+### General dependencies
 
-2. Build the firmware and FPGA bitstream:
-   ```bash
-   cd ~/vsdfpga_labs/basicRISCV/RTL
-   make clean
-   make build
-   ```
+```
+sudo apt-get install git vim autoconf automake autotools-dev curl libmpc-dev \
+libmpfr-dev libgmp-dev gawk build-essential bison flex texinfo gperf libtool \
+patchutils bc zlib1g-dev libexpat1-dev gtkwave picocom -y
+```
 
-3. Flash to FPGA:
-   ```bash
-   sudo make flash
-   ```
+
+### FPGA toolchain (Yosys/NextPNR/IceStorm)
+```
+sudo apt-get install yosys nextpnr-ice40 icestorm iverilog -y
+```
+### RISC-V Toolchain (GCC 8.3.0)
+
+```
+cd ~
+mkdir -p riscv_toolchain && cd riscv_toolchain
+wget "https://static.dev.sifive.com/dev-tools/riscv64-unknown-elf-gcc-8.3.0-2019.08.0-x86_64-linux-ubuntu14.tar.gz"
+tar -xvzf riscv64-unknown-elf-gcc-*.tar.gz
+echo 'export PATH=$HOME/riscv_toolchain/riscv64-unknown-elf-gcc-8.3.0-2019.08.0-x86_64-linux-ubuntu14/bin:$PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+## Building & Running
+
+### Building the file
+
+```
+git clone https://github.com/vsdip/vsdfpga_labs.git
+cd vsdfpga_labs/basicRISCV/Firmware
+nano riscv_logo.c
+make riscv_logo.bram.hex
+```
+![Codespace Build](/images/flash.png)
+
+Compiling and Running the file
+
+```
+riscv64-unknown-elf-gcc -o riscv_logo riscv_logo.c
+spike pk riscv_logo
+```
+![Codespace Build](/images/main.png)
 
 # Step 4: Local Machine Preparation
+Clone both repositories locally: <br>
+```vsd-riscv2``` &  ```vsdfpga_labs```
+
+```bash
+git clone https://github.com/vsdip/vsdfpga_labs.git
+cd vsdfpga_labs
+```
 ![LC_DV](/images/LC_DV.png)
+![LC_DV](/images/LC_DV1.png)
+![LC_DV](/images/LC_DV2.png)
+![LC_DV](/images/LC_DV3.png)
 ---
 
 ## Understanding Questions
@@ -134,7 +165,7 @@ riscv64-unknown-elf-gcc -o sum1ton.o sum1ton.c
 ```
 the sum1ton program, the C source (sum1ton.c) is compiled along with the assembly startup file (load.S) into an ELF binary. The ELF binary contains the compiled machine code and data sections (.text, .data, .bss). This binary is then loaded into the simulated memory of the RISC-V system in the Codespace/simulation environment, a tool like spike (the RISC-V ISA simulator) or a testbench reads the ELF and maps it into the address space, placing the program into instruction memory starting at the reset vector so the core can fetch and execute it.
 ### 3. How does the RISC-V core access memory and memory-mapped I/O?
-The RISC-V core uses load (lw, lb, lh) and store (sw, sb, sh) instructions to access both regular memory and memory-mapped I/O (MMIO). There is no separate I/O instruction set in RISC-V — peripherals are placed at specific fixed addresses in the same address space as RAM.
+The RISC-V core uses load (lw, lb, lh) and store (sw, sb, sh) instructions to access both regular memory and memory-mapped I/O (MMIO). There is no separate I/O instruction set in RISC-V - peripherals are placed at specific fixed addresses in the same address space as RAM.
 
 When the CPU executes a load/store to a particular address:
 
@@ -147,15 +178,15 @@ The SoC uses a simple address decoder (typically in the top-level SoC Verilog) t
 ### 4. Where would a new FPGA IP block logically integrate in this system?
 A new FPGA IP block (e.g., GPIO, Timer, SPI) would integrate at three levels:
 
-- RTL level — A new Verilog module is created for the IP with a memory-mapped register interface (a set of read/write registers at defined offsets).
+- RTL level - A new Verilog module is created for the IP with a memory-mapped register interface (a set of read/write registers at defined offsets).
 
-- SoC top-level — The IP module is instantiated in the SoC top-level file, where:
+- SoC top-level - The IP module is instantiated in the SoC top-level file, where:
 
    - Its bus signals (address, data, write-enable, read-enable) are connected to the main CPU bus.
 
    - An address decoder is updated to assign a base address (e.g., 0x20000000) to the new IP, so CPU load/store instructions targeting that range are routed to the IP.
 
-- Software level — The C firmware running on the RISC-V core accesses the IP by reading/writing to its base address using pointer dereferences:
+- Software level - The C firmware running on the RISC-V core accesses the IP by reading/writing to its base address using pointer dereferences:
 ```
 #define MY_IP_BASE 0x20000000
 volatile unsigned int *reg = (volatile unsigned int *) MY_IP_BASE;
